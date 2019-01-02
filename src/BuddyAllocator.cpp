@@ -108,16 +108,16 @@ void BuddyAllocator::merge(size_t &address, size_t buddyAddress)
             m_freeBitmap &= ~(1 << sizeLog);
     }
     address = address < buddyAddress ? address : buddyAddress;
-    ((unsigned char *)m_memory)[address] = 0x80 | sizeLog + 1 + intLog2(m_minimumSize);
+    ((unsigned char *)m_memory)[address] = 0x80 + sizeLog + 1 + intLog2(m_minimumSize);
 }
 
 size_t BuddyAllocator::findBuddy(size_t address)
 {
-    unsigned sizeLog = ((unsigned char *)m_memory)[address];
+    unsigned sizeLog = ((unsigned char *)m_memory)[address] & 0x7F;
     if (sizeLog == intLog2(m_totalSize))
         return address;
     unsigned buddyAddress = address ^ (1 << sizeLog);
-    if (((unsigned char *)m_memory)[buddyAddress] & 0x80)
+    if (((unsigned char *)m_memory)[buddyAddress] == ((unsigned char *)m_memory)[address])
         return buddyAddress;
     else
         return address;
