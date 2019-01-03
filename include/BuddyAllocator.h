@@ -3,16 +3,22 @@
 
 #include "Allocator.h"
 #include <cmath>
-#include <vector>
-#include <unordered_set>
+#include <string>
 class BuddyAllocator : public Allocator 
 {
 protected:
+    void *m_data = nullptr;
 	std::size_t m_minimumSize;
-    void *m_memory = nullptr;
-	unsigned m_possibleSizes;
-    std::vector<std::unordered_set<std::size_t>> m_freeChunks;
-    std::size_t m_freeBitmap = 0;
+	unsigned char m_levels;
+	
+	std::size_t *m_freeLists;
+	unsigned char *m_index;
+	unsigned char *m_blockLevels;
+	
+	std::size_t m_sizeFreeLists;
+	std::size_t m_sizeIndex;
+	std::size_t m_sizeBlockLevels;
+	std::size_t m_sizeMetadata;
 
 public:
 	BuddyAllocator(const std::size_t totalSize, const std::size_t minimumSize = 16);
@@ -43,19 +49,13 @@ private:
 		return isLog(size) ? intLog2(size) - intLog2(m_minimumSize)
 		 : intLog2(size) + 1 - intLog2(m_minimumSize);
 	}
-	unsigned firstFreeChunk(unsigned size)
+	void error(std::string error)
 	{
-		return __builtin_ctz(m_freeBitmap >> size) + size;
+		std::cout << error << std::endl;
+		exit(1);
 	}
-	std::size_t fragmentAndAllocate(unsigned index, unsigned logToAllocate);
-	std::size_t extractChunk(unsigned index);
-	std::size_t findAndRemoveBuddy(std::size_t address);
-	std::size_t findBuddy(std::size_t address);
-	void deallocate(std::size_t address, unsigned index);
-	void merge(std::size_t &address, std::size_t buddyAddress);
-	void putChunk(std::size_t address, unsigned index);
-
-
+	void initializeSizes();
+	void initializePointers();
 };
 
 #endif /* BUDDYALLOCATOR_H */

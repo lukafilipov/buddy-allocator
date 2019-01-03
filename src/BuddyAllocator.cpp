@@ -2,76 +2,58 @@
 #include "stdlib.h"
 #include <exception>
 #include <iostream>
-#include <string>
+#include <cstring>
 
 using namespace std;
 
-string get_bits(unsigned int x)
+BuddyAllocator::BuddyAllocator(const size_t totalSize, const size_t minimumSize) : 
+Allocator(totalSize), m_minimumSize(minimumSize), 
+m_levels(intLog2(totalSize) - intLog2(minimumSize) + 1)
 {
-    string ret;
-    for (unsigned int mask = 0x80000000; mask; mask >>= 1)
-    {
-        ret += (x & mask) ? "1" : "0";
-    }
-    return ret;
-}
-
-BuddyAllocator::BuddyAllocator(const size_t totalSize, const size_t minimumSize) : Allocator(totalSize),
-                                                                                   m_minimumSize(minimumSize), m_possibleSizes(intLog2(totalSize) - intLog2(minimumSize) + 1),
-                                                                                   m_freeBitmap(1 << (m_possibleSizes - 1)), m_freeChunks(m_possibleSizes)
-{
-    try
-    {
-        if (!isLog(totalSize) || !isLog(minimumSize))
-            throw("Arguments must be a power of two");
-        if (totalSize <= minimumSize)
-            throw("MinimumSize must be smaller than TotalSize");
-        if (minimumSize < 16)
-            throw("MinimumSize must be at least 16");
-    }
-    catch (const char *exc)
-    {
-        cout << exc << endl;
-        exit(1);
-    }
+    if (!isLog(totalSize) || !isLog(minimumSize)) 
+        error("Arguments must be a power of two");
+    if (totalSize <= minimumSize)
+        error("MinimumSize must be smaller than TotalSize");
+    if (minimumSize < 16)
+        error("MinimumSize must be at least 16");
+    initializeSizes();
 }
 
 BuddyAllocator::~BuddyAllocator()
 {
-    free(m_memory);
-    m_memory = nullptr;
+    free(m_data);
+    m_data = nullptr;
 }
 
 void BuddyAllocator::Init()
 {
+    if (m_data == nullptr)
+        m_data = malloc(m_totalSize + m_sizeMetadata);
+    if (m_data == nullptr)
+        error("Requested size is too big");
+    Reset();
+}
 
-    if (m_memory != nullptr)
-        Reset();
-    else
-        m_memory = malloc(m_totalSize);
-    if (m_memory == nullptr)
-    {
-        cout << "Requested memory size is too big" << endl;
-        exit(1);
-    }
-    ((unsigned char *)m_memory)[0] = 0x80 | intLog2(m_totalSize);
-    m_freeChunks[m_possibleSizes - 1].emplace(0);
+void BuddyAllocator::Reset()
+{
+    initializePointers();
+    m_freeLists[0] = (size_t)m_data;
 }
 
 void *BuddyAllocator::Allocate(const size_t size, const std::size_t alignment)
 {
-    if (size == 0)
+    if(size == 0)
         return nullptr;
-    unsigned logToAllocate = firstBiggerLog(size);
-    if (m_freeBitmap >> logToAllocate == 0)
-        return nullptr;
-    unsigned index = firstFreeChunk(logToAllocate);
+    unsigned char logToAllocate = firstBiggerLog(size);
+    unsigned char freeChunk = firstFreeChunk(logToAllocate);
+    size_t address = fragmentAndAllocate(freeChunk, logToAllocate);
     
-    size_t address = fragmentAndAllocate(index, logToAllocate);
-    return (void *)((unsigned char *)m_memory + address);
 }
 
 void BuddyAllocator::Free(void *ptr)
+<<<<<<< HEAD
+{}
+=======
 {
     size_t address = (size_t)((unsigned char *)ptr - (unsigned char *)m_memory);
     size_t buddyAddress;
@@ -122,32 +104,21 @@ size_t BuddyAllocator::findBuddy(size_t address)
     else
         return address;
 }
+>>>>>>> df5122b41fcd6b0759e50bf16ceb4c43450a65df
 
-size_t BuddyAllocator::fragmentAndAllocate(unsigned index, unsigned logToAllocate)
+void BuddyAllocator::initializeSizes()
 {
-    while (index != logToAllocate)
-    {
-        size_t address = extractChunk(index--);
-        putChunk(address, index);
-        putChunk(address | (1 << (intLog2(m_minimumSize) + index)), index);
-    }
-    size_t ret = extractChunk(index);
-    ((unsigned char *)m_memory)[ret] = index + intLog2(m_minimumSize);
-    return ret;
+    m_sizeFreeLists = m_levels * sizeof(size_t);
+    m_sizeIndex = (((1 << m_levels) - 1) / 8 + 1) * sizeof(unsigned char);
+    m_sizeBlockLevels = ((1 << (m_levels - 1)) + 1) * sizeof(unsigned char);
+    m_sizeMetadata = m_sizeIndex + m_sizeFreeLists + m_sizeBlockLevels;
 }
 
-size_t BuddyAllocator::extractChunk(unsigned index)
+void BuddyAllocator::initializePointers()
 {
-    auto address = m_freeChunks[index].begin();
-    m_freeChunks[index].erase(address);
-    if (m_freeChunks[index].size() == 0)
-        m_freeBitmap &= ~(1 << index);
-    return *address;
-}
-
-void BuddyAllocator::putChunk(size_t address, unsigned index)
-{
-    m_freeChunks[index].emplace(address);
-    m_freeBitmap |= (1 << (index));
-    ((unsigned char *)m_memory)[address] = 0x80 | index + intLog2(m_minimumSize);
+    m_freeLists = (size_t*)m_data;
+    m_index = (unsigned char*)m_data + m_sizeFreeLists;
+    m_blockLevels = (unsigned char*)m_data + m_sizeFreeLists + m_sizeIndex;
+    memset(m_data, 0, m_sizeMetadata);
+    m_data = (unsigned char*)m_data + m_sizeMetadata;
 }
