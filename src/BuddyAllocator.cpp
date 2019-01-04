@@ -44,67 +44,16 @@ void *BuddyAllocator::Allocate(const size_t size, const std::size_t alignment)
 {
     if(size == 0)
         return nullptr;
-    unsigned char logToAllocate = firstBiggerLog(size);
-    unsigned char freeChunk = firstFreeChunk(logToAllocate);
-    size_t address = fragmentAndAllocate(freeChunk, logToAllocate);
+    unsigned char levelToAllocate = firstBiggerLog(size);
+    unsigned char freeLevel = firstFreeLevel(levelToAllocate);
+    if(freeLevel == 0xFF)
+        return nullptr;
+    size_t address = fragmentAndAllocate(freeLevel, levelToAllocate);
     
 }
 
 void BuddyAllocator::Free(void *ptr)
-<<<<<<< HEAD
 {}
-=======
-{
-    size_t address = (size_t)((unsigned char *)ptr - (unsigned char *)m_memory);
-    size_t buddyAddress;
-    while ((buddyAddress = findBuddy(address)) != address)
-    {
-        merge(address, buddyAddress);
-    }
-    deallocate(address, (((unsigned char *)m_memory)[address] & ~0x80) - intLog2(m_minimumSize));
-}
-
-void BuddyAllocator::Reset()
-{
-    m_freeBitmap = 1 << (m_possibleSizes - 1);
-    ((unsigned char *)m_memory)[0] = 0x80 | intLog2(m_totalSize);
-    for (auto &i : m_freeChunks)
-        i.clear();
-}
-
-void BuddyAllocator::deallocate(size_t address, unsigned logSize)
-{
-    ((unsigned char *)m_memory)[address] = 0x80 | logSize + intLog2(m_minimumSize);
-    m_freeChunks[logSize].emplace(address);
-    m_freeBitmap |= 1 << (logSize);
-}
-
-void BuddyAllocator::merge(size_t &address, size_t buddyAddress)
-{
-    unsigned sizeLog = (((unsigned char *)m_memory)[buddyAddress] & ~0x80) - intLog2(m_minimumSize);
-    auto buddy = m_freeChunks[sizeLog].find(buddyAddress);
-    if (buddy != m_freeChunks[sizeLog].end())
-    {
-        m_freeChunks[sizeLog].erase(buddy);
-        if (m_freeChunks[sizeLog].empty())
-            m_freeBitmap &= ~(1 << sizeLog);
-    }
-    address = address < buddyAddress ? address : buddyAddress;
-    ((unsigned char *)m_memory)[address] = 0x80 + sizeLog + 1 + intLog2(m_minimumSize);
-}
-
-size_t BuddyAllocator::findBuddy(size_t address)
-{
-    unsigned sizeLog = ((unsigned char *)m_memory)[address] & 0x7F;
-    if (sizeLog == intLog2(m_totalSize))
-        return address;
-    unsigned buddyAddress = address ^ (1 << sizeLog);
-    if (((unsigned char *)m_memory)[buddyAddress] == ((unsigned char *)m_memory)[address])
-        return buddyAddress;
-    else
-        return address;
-}
->>>>>>> df5122b41fcd6b0759e50bf16ceb4c43450a65df
 
 void BuddyAllocator::initializeSizes()
 {
@@ -121,4 +70,36 @@ void BuddyAllocator::initializePointers()
     m_blockLevels = (unsigned char*)m_data + m_sizeFreeLists + m_sizeIndex;
     memset(m_data, 0, m_sizeMetadata);
     m_data = (unsigned char*)m_data + m_sizeMetadata;
+}
+
+unsigned char BuddyAllocator::firstFreeLevel(unsigned char levelToAllocate)
+{
+    for(unsigned char i = levelToAllocate; i >= 0; i--)
+    {
+        if(m_freeLists[i] != 0)
+            return m_freeLists[i];
+    }
+    return 0xFF;
+}
+
+void *BuddyAllocator::fragmentAndAllocate(unsigned char freeLevel, unsigned char levelToAllocate)
+{
+    while (freeLevel != levelToAllocate)
+    {
+        size_t address = getBlock(freeLevel--);
+        putBlock(address, freeLevel);
+        putBlock(address | (1 << (intLog2(m_minimumSize) + freeLevel)), freeLevel);
+    }
+    size_t ret = getBlock(freeLevel);
+    return (void*)ret;
+}
+
+size_t BuddyAllocator::getBlock(unsigned char freeLevel)
+{
+
+}
+
+void BuddyAllocator::putBlock(size_t address, unsigned char freeLevel)
+{
+
 }

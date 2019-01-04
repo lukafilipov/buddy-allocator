@@ -56,6 +56,10 @@ private:
 	}
 	void initializeSizes();
 	void initializePointers();
+	unsigned char firstFreeLevel(unsigned char levelToAllocate);
+	void *fragmentAndAllocate(unsigned char freeLevel, unsigned char levelToAllocate);
+	std::size_t getBlock(unsigned char freeLevel);
+	void putBlock(size_t address, unsigned char freeLevel);
 };
 
 #endif /* BUDDYALLOCATOR_H */
