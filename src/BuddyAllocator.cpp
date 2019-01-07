@@ -36,6 +36,7 @@ void BuddyAllocator::Init()
 void BuddyAllocator::Reset()
 {
     initializePointers();
+    putBlock(0,0);
 }
 
 void *BuddyAllocator::Allocate(const size_t size, const std::size_t alignment)
@@ -70,11 +71,11 @@ void BuddyAllocator::initializeSizes()
 void BuddyAllocator::initializePointers()
 {
     m_freeLists = (size_t *)m_data;
-    for(int i = 1; i < m_levels; i ++)
+    for(int i = 0; i < m_levels; i ++)
         m_freeLists[i] = SIZE_T_MAX;
     m_blockIndex = (byte *)m_data + m_sizeFreeLists;
     m_blockLevels = (byte *)m_data + m_sizeFreeLists + m_sizeIndex;
-    memset(m_data, 0, m_sizeMetadata);
+    memset(m_blockIndex, 0, m_sizeMetadata);
     m_data = (byte *)m_data + m_sizeMetadata;
 }
 
@@ -92,7 +93,7 @@ void *BuddyAllocator::fragmentAndAllocate(byte level, byte levelToAllocate)
 {
     while (level != levelToAllocate)
     {
-        size_t address = getBlock(level--);
+        size_t address = getBlock(level++);
         putBlock(address, level);
         putBlock(address | (1 << (intLog2(m_minimumSize) + level)), level);
     }
@@ -107,8 +108,10 @@ size_t BuddyAllocator::getBlock(byte level)
     m_freeLists[level] = block[1];
 
     //Mark block as allocated
-    size_t index = (1 << level) - 1 + address / level;
+    size_t index = getIndex(address, level);
     m_blockIndex[index / 8] |= 1 << (7 - index % 8);
+
+    return address;
 }
 
 void BuddyAllocator::putBlock(size_t address, byte level)
@@ -116,7 +119,7 @@ void BuddyAllocator::putBlock(size_t address, byte level)
     putBlockInFreeList(address, level);
 
     //Mark block as deallocated
-    size_t index = (1 << level) - 1 + address / level;
+    size_t index = getIndex(address, level);
     m_blockIndex[index / 8] &= ~(1 << (7 - index % 8));
 
     //Set size in blockLevels array
@@ -147,7 +150,7 @@ size_t BuddyAllocator::findFreeBuddy(size_t address)
     byte blockLevel = m_blockLevels[address / m_minimumSize];
     if (blockLevel == 0)
         return address;
-    size_t index = (1 << blockLevel) - 1 + address / blockLevel;
+    size_t index = getIndex(address, blockLevel);
     bool isBuddyFree = (m_blockIndex[index / 8] & (1 << (7 - index % 8)) == 0);
     if (isBuddyFree)
         return address ^ (1 << (m_levels - blockLevel - 1 + intLog2(m_minimumSize)));
@@ -180,4 +183,10 @@ void BuddyAllocator::eraseBlock(size_t address, byte level)
         prevBlock[1] = block[1];
         nextBlock[0] = block[0];
     }
+}
+
+size_t BuddyAllocator::getIndex(size_t address, byte level)
+{
+    size_t levelSize = 1 << level;
+    return (levelSize - 1 + address / (m_totalSize / levelSize));
 }

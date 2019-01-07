@@ -72,6 +72,7 @@ private:
 	std::size_t getBlock(byte freeLevel);
 	void putBlock(size_t address, byte freeLevel);
 	void putBlockInFreeList(size_t address, byte freeLevel);
+	std::size_t getIndex(size_t address, byte level);
 
 };
 
