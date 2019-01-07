@@ -20,7 +20,7 @@ int main() {
     Allocator * stackAllocator = new StackAllocator(1e9);
     Allocator * poolAllocator = new PoolAllocator(16777216, 4096);
     Allocator * freeListAllocator = new FreeListAllocator(1e8, FreeListAllocator::PlacementPolicy::FIND_FIRST);
-    Allocator * buddyAllocator = new BuddyAllocator(1<<20, 16);
+    Allocator * buddyAllocator = new BuddyAllocator(1<<30, 16);
 
     Benchmark benchmark(1e1);
 
