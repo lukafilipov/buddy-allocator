@@ -6,7 +6,7 @@
 #include <string>
 #include <iostream>
 
-typedef unsigned byte;
+typedef unsigned char byte;
 
 class BuddyAllocator : public Allocator 
 {
@@ -51,7 +51,7 @@ private:
 	}
 	byte firstBiggerLog(std::size_t size)
 	{
-		if(size <= m_minimumSize) return 0;
+		if(size <= m_minimumSize) return m_levels - 1;
 		if(isLog(size))
 			return m_levels - (intLog2(size) - intLog2(m_minimumSize)) - 1;
 		else
@@ -63,15 +63,25 @@ private:
 		exit(1);
 	}
 	void initializeSizes();
+	
 	void initializePointers();
+	
 	byte firstFreeLevel(byte levelToAllocate);
-	void *fragmentAndAllocate(byte freeLevel, byte levelToAllocate);
+	
+	std::size_t fragmentAndAllocate(byte freeLevel, byte levelToAllocate);
+	
 	std::size_t findFreeBuddy(size_t address);
+	
 	void merge(std::size_t &address, size_t buddyAddress);
+	
 	void eraseBlock(std::size_t address, byte level);
+	
 	std::size_t getBlock(byte freeLevel);
+	
 	void putBlock(size_t address, byte freeLevel);
+	
 	void putBlockInFreeList(size_t address, byte freeLevel);
+	
 	std::size_t getIndex(size_t address, byte level);
 
 };

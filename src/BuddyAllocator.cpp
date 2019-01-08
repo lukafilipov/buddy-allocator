@@ -20,7 +20,7 @@ BuddyAllocator::BuddyAllocator(const size_t totalSize, const size_t minimumSize)
 
 BuddyAllocator::~BuddyAllocator()
 {
-    free(m_data);
+    free(m_freeLists);
     m_data = nullptr;
 }
 
@@ -28,6 +28,8 @@ void BuddyAllocator::Init()
 {
     if (m_data == nullptr)
         m_data = malloc(m_totalSize + m_sizeMetadata);
+    else
+        m_data = m_freeLists;
     if (m_data == nullptr)
         error("Requested size is too big");
     Reset();
@@ -47,7 +49,8 @@ void *BuddyAllocator::Allocate(const size_t size, const std::size_t alignment)
     byte level = firstFreeLevel(levelToAllocate);
     if (level == 0xFF)
         return nullptr;
-    void *address = fragmentAndAllocate(level, levelToAllocate);
+    size_t address = fragmentAndAllocate(level, levelToAllocate);
+    return (void*)((byte*)m_data + address);
 }
 
 void BuddyAllocator::Free(void *ptr)
@@ -77,6 +80,8 @@ void BuddyAllocator::initializePointers()
     m_blockLevels = (byte *)m_data + m_sizeFreeLists + m_sizeIndex;
     memset(m_blockIndex, 0, m_sizeMetadata);
     m_data = (byte *)m_data + m_sizeMetadata;
+    size_t *block = (size_t *)((byte *)m_data + 1015808);
+    block[1] = 1;
 }
 
 byte BuddyAllocator::firstFreeLevel(byte levelToAllocate)
@@ -89,15 +94,15 @@ byte BuddyAllocator::firstFreeLevel(byte levelToAllocate)
     return 0xFF;
 }
 
-void *BuddyAllocator::fragmentAndAllocate(byte level, byte levelToAllocate)
+size_t BuddyAllocator::fragmentAndAllocate(byte level, byte levelToAllocate)
 {
     while (level != levelToAllocate)
     {
         size_t address = getBlock(level++);
         putBlock(address, level);
-        putBlock(address | (1 << (intLog2(m_minimumSize) + level)), level);
+        putBlock(address | (1 << (intLog2(m_totalSize) - level)), level);
     }
-    return (void *)getBlock(level);
+    return getBlock(level);
 }
 
 size_t BuddyAllocator::getBlock(byte level)
